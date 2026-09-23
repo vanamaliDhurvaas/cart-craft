@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  createdAt     DateTime  @default(now())
+
+  // Kroger OAuth tokens (per-user; each user connects their own Kroger account)
+  krogerAccessToken  String?
+  krogerRefreshToken String?
+  krogerTokenExpiresAt DateTime?
+  krogerLocationId   String? // preferred store, set after connecting
+
+  recipes    Recipe[]
+  mealPlans  MealPlan[]
+  shoppingLists ShoppingList[]
+}
+
+enum RecipeSourceType {
+  MANUAL
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+  WEB
+}
+
+model Recipe {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  sourceUrl    String?
+  sourceType   RecipeSourceType @default(MANUAL)
+  instructions String?  @db.Text
+  servings     Int?     @default(1)
+  rawExtractedText String? @db.Text // caption/transcript kept for debugging/re-parsing
+  createdAt    DateTime @default(now())
+
+  ingredients  Ingredient[]
+  mealPlanEntries MealPlanEntry[]
+
+  @@index([userId])
+}
+
+model Ingredient {
+  id         String  @id @default(cuid())
+  recipeId   String
+  recipe     Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  rawLine    String  // original text, e.g. "2 1/2 cups all-purpose flour"
+  quantity   Float?  // parsed numeric quantity, e.g. 2.5
+  unit       String? // normalized unit, e.g. "cup"
+  name       String  // normalized ingredient name, e.g. "all-purpose flour"
+  notes      String? // e.g. "diced", "optional"
+  sortOrder  Int     @default(0)
+
+  @@index([recipeId])
+}
+
+model MealPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+
+  entries       MealPlanEntry[]
+  shoppingLists ShoppingList[]
+
+  @@index([userId])
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model MealPlanEntry {
+  id          String   @id @default(cuid())
+  mealPlanId  String
+  mealPlan    MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipeId    String
+  recipe      Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  date        DateTime
+  mealType    MealType @default(DINNER)
+  servingsMultiplier Float @default(1)
+
+  @@index([mealPlanId])
+}
+
+enum ShoppingListStatus {
+  DRAFT
+  MATCHED
+  PUSHED_TO_KROGER
+}
+
+model ShoppingList {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlanId String
+  mealPlan   MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  status     ShoppingListStatus @default(DRAFT)
+  createdAt  DateTime @default(now())
+  pushedAt   DateTime?
+
+  items ShoppingListItem[]
+
+  @@index([userId])
+  @@index([mealPlanId])
+}
+
+model ShoppingListItem {
+  id               String  @id @default(cuid())
+  shoppingListId   String
+  shoppingList     ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  ingredientName   String  // aggregated, normalized name
+  quantity         Float
+  unit             String?
+  // Kroger product matching
+  krogerProductId  String?
+  matchedProductDescription String?
+  matchedProductSize String? // e.g. "32 FL OZ", "12 CT" — used to compute how many packages to buy
+  matchConfidence  Float?  // 0-1 heuristic score
+  userConfirmed    Boolean @default(false)
+  addedToCart      Boolean @default(false)
+
+  @@index([shoppingListId])
+}
