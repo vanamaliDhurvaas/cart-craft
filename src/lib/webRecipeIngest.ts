@@ -26,7 +26,7 @@ async function fetchHtml(url: string): Promise<string> {
     headers: {
       // Some sites block requests with no/unusual User-Agent.
       "user-agent":
-        "Mozilla/5.0 (compatible; MealPrepBot/1.0; +https://github.com/) AppleWebKit/537.36"
+        "Mozilla/5.0 (compatible; CartCraftBot/1.0; +https://github.com/) AppleWebKit/537.36"
     }
   });
   if (!res.ok) throw new Error(`Failed to fetch page (${res.status})`);
@@ -42,23 +42,16 @@ function extractRecipeJsonLd(html: string): Record<string, any> | null {
     return type === "Recipe" || (Array.isArray(type) && type.includes("Recipe"));
   };
 
-  for (const block of blocks) {
-    let parsed: any;
+  for (const [, raw] of blocks) {
+    let data: any;
     try {
-      parsed = JSON.parse(block[1].trim());
+      data = JSON.parse(raw);
     } catch {
-      continue; // malformed JSON-LD is common in the wild — just skip it
+      continue;
     }
-
-    const candidates: any[] = Array.isArray(parsed) ? parsed : [parsed];
-    for (const candidate of candidates) {
-      if (isRecipe(candidate)) return candidate;
-      // Recipe is sometimes nested inside a top-level @graph array.
-      if (Array.isArray(candidate?.["@graph"])) {
-        const found = candidate["@graph"].find(isRecipe);
-        if (found) return found;
-      }
-    }
+    const candidates = Array.isArray(data) ? data : data["@graph"] ? data["@graph"] : [data];
+    const recipe = candidates.find(isRecipe);
+    if (recipe) return recipe;
   }
   return null;
 }
@@ -109,9 +102,14 @@ export async function ingestWebRecipeUrl(url: string): Promise<WebIngestResult> 
     };
   }
 
-  // No structured data found — fall back to visible text + LLM extraction.
+  // No structured data found — fall back to visible text + LLM extraction,
+  // but only when the LLM is actually configured. Previously this called
+  // extractRecipeFromText() unconditionally, which *throws* when
+  // ANTHROPIC_API_KEY is unset — turning "no AI key configured" into a hard
+  // 502 for every non-JSON-LD page instead of a graceful manual-entry
+  // fallback (the video ingestion path already guards this correctly).
   const text = stripHtml(html).slice(0, 20000);
-  if (!text) {
+  if (!text || !process.env.ANTHROPIC_API_KEY) {
     return { title: null, ingredients: [], instructions: null, servings: null, needsManualInput: true };
   }
 

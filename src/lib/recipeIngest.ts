@@ -21,26 +21,49 @@ export interface IngestedRecipe {
   ingredients: ParsedIngredient[];
   instructions: string | null;
   needsManualInput: boolean;
+  /**
+   * Human-readable explanation of *why* manual entry is needed, shown to the
+   * user instead of a one-size-fits-all "couldn't extract" message. Null
+   * when needsManualInput is false.
+   */
+  extractionNote: string | null;
 }
+
+const AI_CONFIGURED = () => Boolean(process.env.ANTHROPIC_API_KEY);
+const AUDIO_CONFIGURED = () => Boolean(process.env.OPENAI_API_KEY);
 
 export async function ingestRecipeFromUrl(url: string): Promise<IngestedRecipe> {
   const sourceType = detectSourceType(url);
 
   if (sourceType === "WEB") {
     const web = await ingestWebRecipeUrl(url);
+    let extractionNote: string | null = null;
+    if (web.needsManualInput) {
+      extractionNote = AI_CONFIGURED()
+        ? "This page doesn't use the structured recipe format search engines look for, and AI extraction didn't find a clear ingredient list on the page either."
+        : "This page doesn't use the structured recipe format search engines look for, so we'd need AI extraction turned on (ANTHROPIC_API_KEY) to read the ingredients out of the page text.";
+    }
     return {
       title: web.title,
       sourceType,
       rawExtractedText: web.ingredients.map((i) => i.rawLine).join("\n"),
       ingredients: web.ingredients,
       instructions: web.instructions,
-      needsManualInput: web.needsManualInput
+      needsManualInput: web.needsManualInput,
+      extractionNote
     };
   }
 
   const video = await ingestVideoUrl(url);
 
   if (video.needsManualInput || !video.rawText.trim()) {
+    const extractionNote = !video.rawText.trim()
+      ? "We couldn't get a caption, description, or transcript for this video at all."
+      : video.usedAudioTranscription
+        ? "We checked the video's caption and transcribed the audio, but neither mentioned a clear ingredient list — this video may only show ingredients as on-screen text or graphics, which we can't read yet."
+        : AUDIO_CONFIGURED()
+          ? "The caption didn't contain a clear ingredient list."
+          : "The caption didn't contain a clear ingredient list, and audio transcription (OPENAI_API_KEY) isn't turned on to check what's said out loud.";
     return {
       title: video.title,
       sourceType: video.sourceType,
@@ -51,7 +74,8 @@ export async function ingestRecipeFromUrl(url: string): Promise<IngestedRecipe> 
       rawExtractedText: extractIngredientsSection(video.rawText),
       ingredients: [],
       instructions: null,
-      needsManualInput: true
+      needsManualInput: true,
+      extractionNote
     };
   }
 
@@ -61,15 +85,21 @@ export async function ingestRecipeFromUrl(url: string): Promise<IngestedRecipe> 
   // steps, and promo links, which the deterministic line-by-line parser
   // can't tell apart from real ingredient lines. The LLM is explicitly
   // instructed to pull out only actual ingredients.
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (AI_CONFIGURED()) {
     const extracted = await extractRecipeFromText(video.rawText);
+    const extractionNote = extracted.noIngredientsFound
+      ? video.usedAudioTranscription
+        ? "AI checked the caption and the spoken audio, but didn't find a clear ingredient list in either — this video may only show ingredients as on-screen text or graphics, which we can't read yet."
+        : "AI checked the caption but didn't find a clear ingredient list."
+      : null;
     return {
       title: extracted.title ?? video.title,
       sourceType: video.sourceType,
       rawExtractedText: extractIngredientsSection(video.rawText),
       ingredients: extracted.ingredients,
       instructions: extracted.instructions,
-      needsManualInput: extracted.noIngredientsFound
+      needsManualInput: extracted.noIngredientsFound,
+      extractionNote
     };
   }
 
@@ -85,7 +115,11 @@ export async function ingestRecipeFromUrl(url: string): Promise<IngestedRecipe> 
       rawExtractedText: section,
       ingredients,
       instructions: null,
-      needsManualInput: ingredients.length === 0
+      needsManualInput: ingredients.length === 0,
+      extractionNote:
+        ingredients.length === 0
+          ? "We found what looked like an ingredients section but couldn't parse the individual lines. Turning on AI extraction (ANTHROPIC_API_KEY) handles messy formatting like this much better."
+          : null
     };
   }
 
@@ -95,6 +129,8 @@ export async function ingestRecipeFromUrl(url: string): Promise<IngestedRecipe> 
     rawExtractedText: extractIngredientsSection(video.rawText),
     ingredients: [],
     instructions: null,
-    needsManualInput: true
+    needsManualInput: true,
+    extractionNote:
+      "AI extraction (ANTHROPIC_API_KEY) isn't turned on, so we could only check the caption for an obvious ingredient list, and didn't find one."
   };
 }

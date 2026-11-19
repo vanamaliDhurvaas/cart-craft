@@ -14,7 +14,7 @@
 import type { ParsedIngredient } from "./ingredientParser";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const DEFAULT_MODEL = "claude-haiku-4-6";
+const DEFAULT_MODEL = "claude-haiku-5-5";
 
 export interface ExtractedRecipe {
   title: string | null;

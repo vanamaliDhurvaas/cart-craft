@@ -123,7 +123,7 @@ export function extractIngredientsSection(text: string): string {
 
 /** Download just the audio track to a temp file, in a format Whisper accepts. */
 async function downloadAudio(url: string): Promise<{ filePath: string; cleanup: () => Promise<void> }> {
-  const dir = await mkdtemp(join(tmpdir(), "meal-prep-audio-"));
+  const dir = await mkdtemp(join(tmpdir(), "cartcraft-audio-"));
   const outTemplate = join(dir, "audio.%(ext)s");
   await execFileAsync(
     "yt-dlp",

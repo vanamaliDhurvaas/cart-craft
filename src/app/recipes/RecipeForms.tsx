@@ -7,7 +7,7 @@ import { Label, Input, Textarea, ErrorText, Hint, SuccessText } from "@/componen
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { LinkIcon, PencilIcon, SparklesIcon, TrashIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import { LinkIcon, PencilIcon, SparklesIcon, TrashIcon, ChevronRightIcon, CartIcon } from "@/components/ui/Icons";
 import { cn } from "@/lib/cn";
 
 /** After adding a recipe, bring the (newest-first) recipe list into view so the addition is visible. */
@@ -34,7 +34,11 @@ export function AddByUrlForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [needsManual, setNeedsManual] = useState<{ title: string | null; rawExtractedText: string } | null>(null);
+  const [needsManual, setNeedsManual] = useState<{
+    title: string | null;
+    rawExtractedText: string;
+    extractionNote: string | null;
+  } | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +58,7 @@ export function AddByUrlForm() {
       return;
     }
     if (data.needsManualInput) {
-      setNeedsManual({ title: data.title, rawExtractedText: data.rawExtractedText });
+      setNeedsManual({ title: data.title, rawExtractedText: data.rawExtractedText, extractionNote: data.extractionNote ?? null });
       return;
     }
     setUrl("");
@@ -106,9 +110,10 @@ export function AddByUrlForm() {
         <Alert variant="warn" className="mt-5">
           <p className="font-semibold text-fg">Couldn&apos;t auto-extract ingredients from that link.</p>
           <p className="my-2 text-fg-muted">
-            {needsManual.rawExtractedText
-              ? "Here's what we found — paste/edit the ingredient list below and add it manually."
-              : "We couldn't read a caption or transcript for this video. Paste the ingredient list below."}
+            {needsManual.extractionNote ??
+              (needsManual.rawExtractedText
+                ? "Here's what we found — paste/edit the ingredient list below and add it manually."
+                : "We couldn't read a caption or transcript for this video. Paste the ingredient list below.")}
           </p>
           <ManualForm
             prefillTitle={needsManual.title ?? ""}
@@ -234,6 +239,29 @@ export function RecipeCard({ recipe }: { recipe: RecipeCardData }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ordering, setOrdering] = useState(false);
+  const [orderServings, setOrderServings] = useState(recipe.servings ?? 1);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+
+  async function onQuickOrder() {
+    setOrderLoading(true);
+    setOrderError(null);
+    const base = recipe.servings ?? 1;
+    const servingsMultiplier = orderServings / base;
+    const res = await fetch(`/api/recipes/${recipe.id}/quick-order`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ servingsMultiplier })
+    });
+    const data = await res.json().catch(() => null);
+    setOrderLoading(false);
+    if (!res.ok) {
+      setOrderError(data?.error ?? "Couldn't start that order.");
+      return;
+    }
+    router.push(`/shopping-list/${data.id}`);
+  }
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -322,6 +350,9 @@ export function RecipeCard({ recipe }: { recipe: RecipeCardData }) {
       <div className="mb-3 flex items-start justify-between gap-3">
         <Badge variant="muted">{SOURCE_LABEL[recipe.sourceType] ?? recipe.sourceType}</Badge>
         <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+          <IconButton label="Quick order to Kroger cart" onClick={() => setOrdering((v) => !v)} disabled={recipe.ingredients.length === 0}>
+            <CartIcon size={15} />
+          </IconButton>
           <IconButton label="Edit recipe" onClick={() => setEditing(true)}>
             <PencilIcon size={15} />
           </IconButton>
@@ -348,6 +379,33 @@ export function RecipeCard({ recipe }: { recipe: RecipeCardData }) {
             </span>
           ))}
           {more > 0 && <span className="px-1 py-0.5 text-xs text-fg-faint">+{more} more</span>}
+        </div>
+      )}
+
+      {ordering && (
+        <div className="mt-4 rounded-xl border border-line bg-surface-2 p-3">
+          <Label htmlFor={`order-servings-${recipe.id}`}>Cooking for how many servings?</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id={`order-servings-${recipe.id}`}
+              type="number"
+              min={1}
+              step="0.5"
+              value={orderServings}
+              onChange={(e) => setOrderServings(parseFloat(e.target.value) || 1)}
+              className="w-24"
+            />
+            <span className="text-xs text-fg-faint">this recipe is written for {recipe.servings ?? 1}</span>
+          </div>
+          {orderError && <ErrorText>{orderError}</ErrorText>}
+          <div className="mt-3 flex gap-2">
+            <Button type="button" onClick={onQuickOrder} disabled={orderLoading}>
+              {orderLoading ? "Starting…" : "Add to cart"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setOrdering(false)} disabled={orderLoading}>
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
 

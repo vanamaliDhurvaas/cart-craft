@@ -31,7 +31,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-8 lg:py-14">{children}</main>
       <footer className="mx-auto w-full max-w-5xl px-5 pb-8 pt-4 sm:px-8">
         <div className="divider-wavy mb-4" aria-hidden />
-        <p className="text-center text-xs text-fg-faint">Made for home cooks · Meal Prep</p>
+        <p className="text-center text-xs text-fg-faint">Made for home cooks · CartCraft</p>
       </footer>
     </div>
   );

@@ -34,7 +34,8 @@ export async function POST(req: Request) {
         needsManualInput: true,
         title: ingested.title,
         rawExtractedText: ingested.rawExtractedText,
-        sourceType: ingested.sourceType
+        sourceType: ingested.sourceType,
+        extractionNote: ingested.extractionNote
       },
       { status: 200 }
     );

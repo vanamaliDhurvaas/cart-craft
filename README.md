@@ -1,4 +1,4 @@
-# Meal Prep → Kroger Cart
+# CartCraft → Kroger Cart
 
 Plan meals for any date range (a day, a week, a month), pull ingredients straight from recipe URLs — including
 TikTok, Instagram Reels, and YouTube — and push an aggregated shopping list directly into your real Kroger cart.
@@ -59,7 +59,7 @@ Checked both major platforms before building this:
    don't have one).
 2. Go to your dashboard and click **Register an Application** (sometimes called "Add Application").
 3. Fill in the application details:
-   - **Application name**: anything descriptive, e.g. "Meal Prep Cart"
+   - **Application name**: anything descriptive, e.g. "CartCraft"
    - **Application type**: choose the option for a web app that needs user authorization (not
      "client credentials only") — you need this because the Cart API acts on behalf of a real shopper.
    - **Redirect URI**: must exactly match what you'll set as `KROGER_REDIRECT_URI` — for local dev that's

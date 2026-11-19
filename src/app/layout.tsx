@@ -20,8 +20,8 @@ const fraunces = Fraunces({
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 
 export const metadata: Metadata = {
-  title: "Meal Prep — recipes to a Kroger cart",
-  description: "Save the recipes you love, plan your week, and let us fill your Kroger cart."
+  title: "CartCraft — recipes to a Kroger cart",
+  description: "Save the recipes you love, plan your week, and let CartCraft fill your Kroger cart."
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
