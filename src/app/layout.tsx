@@ -20,8 +20,24 @@ const fraunces = Fraunces({
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cart-craft-mjy0.onrender.com"),
   title: "CartCraft — recipes to a Kroger cart",
-  description: "Save the recipes you love, plan your week, and let CartCraft fill your Kroger cart."
+  description: "Save the recipes you love, plan your week, and let CartCraft fill your Kroger cart.",
+  // Explicit Open Graph / Twitter title so link-preview crawlers (iMessage,
+  // WhatsApp, Slack, etc.) show "CartCraft" cleanly instead of guessing at
+  // a site name by splitting the <title> string on the em dash above.
+  openGraph: {
+    title: "CartCraft",
+    description: "Save the recipes you love, plan your week, and let CartCraft fill your Kroger cart.",
+    siteName: "CartCraft",
+    url: "https://cart-craft-mjy0.onrender.com",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: "CartCraft",
+    description: "Save the recipes you love, plan your week, and let CartCraft fill your Kroger cart."
+  }
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
